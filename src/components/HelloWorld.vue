@@ -1,75 +1,47 @@
 <template>
   <v-container class="fill-height">
-    <v-responsive class="align-center text-center fill-height">
-      <v-img height="300" src="@/assets/logo.svg" />
-
-      <div class="text-body-2 font-weight-light mb-n1">Welcome to</div>
-
-      <h1 class="text-h2 font-weight-bold">Vuetify</h1>
-
-      <div class="py-14" />
-
-      <v-row class="d-flex align-center justify-center">
-        <v-col cols="auto">
-          <v-btn
-            href="https://vuetifyjs.com/components/all/"
-            min-width="164"
-            rel="noopener noreferrer"
-            target="_blank"
-            variant="text"
-          >
-            <v-icon
-              icon="mdi-view-dashboard"
-              size="large"
-              start
-            />
-
-            Components
-          </v-btn>
-        </v-col>
-
-        <v-col cols="auto">
-          <v-btn
-            color="primary"
-            href="https://vuetifyjs.com/introduction/why-vuetify/#feature-guides"
-            min-width="228"
-            rel="noopener noreferrer"
-            size="x-large"
-            target="_blank"
-            variant="flat"
-          >
-            <v-icon
-              icon="mdi-speedometer"
-              size="large"
-              start
-            />
-
-            Get Started
-          </v-btn>
-        </v-col>
-
-        <v-col cols="auto">
-          <v-btn
-            href="https://community.vuetifyjs.com/"
-            min-width="164"
-            rel="noopener noreferrer"
-            target="_blank"
-            variant="text"
-          >
-            <v-icon
-              icon="mdi-account-group"
-              size="large"
-              start
-            />
-
-            Community
-          </v-btn>
-        </v-col>
-      </v-row>
-    </v-responsive>
+    <v-col>
+      <v-file-input accept="image/*" v-model="image" @change="uploadImage" label="Загрузить изображение"></v-file-input>
+      <canvas @mousemove="getPixelData" id="myCanvas" style="border:1px solid #000000;"></canvas>
+      {{ colorData }}
+    </v-col>
   </v-container>
 </template>
 
-<script setup>
-  //
+<script>
+  export default {
+  data(){
+    return {
+      image: null,
+      colorData: "",
+    }
+  },
+  methods: {
+    uploadImage() {
+      var c = document.getElementById("myCanvas");
+      var ctx = c.getContext("2d");
+      var img = new Image();
+      img.onload = function(){
+        c.height = img.height;
+        c.width = img.width;
+        ctx.drawImage(img, 0, 0);
+      }
+      img.src = URL.createObjectURL(this.image[0]);
+    },
+    getMousePos(canvas, evt) {
+      var rect = canvas.getBoundingClientRect();
+      return {
+        x: evt.clientX - rect.left,
+        y: evt.clientY - rect.top
+      };
+    },
+    getPixelData(evt) {
+      var canvas = document.getElementById("myCanvas");
+      var context = canvas.getContext("2d");
+      var pos = this.getMousePos(canvas, evt);
+      var pixelData = context.getImageData(pos.x, pos.y, 1, 1);
+      this.colorData = [pixelData.data[0], pixelData.data[1], pixelData.data[2]].toString();
+    }
+  }
+}
 </script>
