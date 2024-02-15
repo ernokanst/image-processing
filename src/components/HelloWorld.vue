@@ -1,8 +1,9 @@
 <template>
     <v-col>
       <v-file-input accept="image/*" v-model="image" @change="uploadImage" label="Загрузить изображение"></v-file-input>
+      <v-text-field v-model="photoLink" @keydown.enter="getImage" label="Ссылка на изображение"></v-text-field>
       <canvas @mousemove="getPixelData" id="myCanvas" style="border:1px solid #000000;"></canvas>
-      <v-card class="d-none">
+      <v-card style="opacity: 0">
       <v-card-item>
         <v-card-title>{{ dimData }}</v-card-title>
         <v-card-title>{{ posData }}</v-card-title>
@@ -29,9 +30,23 @@
       colorData: "",
       posData: "",
       dimData: "",
+      photoLink: "",
     }
   },
   methods: {
+    getImage() { //Перед использованием включить https://cors-anywhere.herokuapp.com/
+      var c = document.getElementById("myCanvas");
+      var ctx = c.getContext("2d");
+      var img = new Image();
+      img.onload = function(){
+        c.height = img.height;
+        c.width = img.width;
+        ctx.drawImage(img, 0, 0);
+        this.image = null;
+      }
+      img.crossOrigin = "Anonymous";
+      img.src = "https://cors-anywhere.herokuapp.com/" + this.photoLink;
+    },
     uploadImage() {
       var c = document.getElementById("myCanvas");
       var ctx = c.getContext("2d");
@@ -41,7 +56,9 @@
         c.width = img.width;
         ctx.drawImage(img, 0, 0);
       }
-      img.src = URL.createObjectURL(this.image[0]);
+      var imgurl = URL.createObjectURL(this.image[0]);
+      img.src = imgurl;
+      this.photoLink = imgurl;
     },
     getMousePos(canvas, evt) {
       var rect = canvas.getBoundingClientRect();
