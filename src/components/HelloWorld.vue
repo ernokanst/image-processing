@@ -1,6 +1,7 @@
 <template>
     <v-col>
-      <v-file-input accept="image/*" v-model="image" @change="uploadImage" label="Загрузить изображение"></v-file-input>
+      <h1>Загрузите изображение</h1>
+      <v-file-input accept="image/*" v-model="image" @change="uploadImage" label="Загрузить изображение с компьютера"></v-file-input>
       <v-text-field v-model="photoLink" @keydown.enter="getImage" label="Ссылка на изображение"></v-text-field>
       <canvas @mousemove="getPixelData" id="myCanvas" style="border:1px solid #000000;"></canvas>
       <v-card style="opacity: 0">
