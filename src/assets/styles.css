@@ -2,6 +2,9 @@ footer {
     position: fixed;
     bottom: 0;
     width: 100%;
+    background: rgb(var(--v-theme-surface));
+    color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
+    padding: auto;
 }
 body {
     overflow-x: scroll;
