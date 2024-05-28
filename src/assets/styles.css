@@ -1,19 +1,8 @@
-footer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    background: rgb(var(--v-theme-surface));
-    color: rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity));
-    padding: auto;
-}
-body {
-    overflow-x: scroll;
-}
 h1 {
     font-weight: 300;
     font-size: 64px;
     text-align: center;
-    margin: 2.5% auto;
+    margin-top: 64px;
 }
 #container {
     margin: 0 auto;
@@ -23,7 +12,35 @@ h1 {
     float: right;
     width: 200px;
 }
-
-#content {
-    overflow-x: scroll;
+.v-main {
+    --v-layout-top: 0px !important;
+}
+footer {
+    overflow: auto;
+    width: 100%;
+}
+table {
+    border: 1px solid #dededf;
+    height: 100%;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 1px;
+    text-align: center;
+}
+caption {
+    caption-side: top;
+    text-align: left;
+}
+th {
+    border: 1px solid #dededf;
+    background-color: #eceff1;
+    color: #000000;
+    padding: 5px;
+}
+td {
+    border: 1px solid #dededf;
+    background-color: #ffffff;
+    color: #000000;
+    padding: 5px;
 }
