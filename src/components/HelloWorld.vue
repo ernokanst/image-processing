@@ -21,9 +21,13 @@
         prepend-icon="mdi-image-size-select-large"
         title="Изменить размер"
       >
-      <a>Текущий {{ dimData }}</a>
-      <v-text-field label="Ширина"></v-text-field>
-      <v-text-field label="Высота"></v-text-field>
+      <a>Оригинальный размер: {{ dimData }}</a>
+      <a>Текущий масштаб: {{ scaleData }}%</a>
+      <a>Текущий размер:</a>
+      <v-text-field @mousemove="fixedRatioW" v-model="currentW" type="number" label="Ширина"></v-text-field>
+      <v-text-field @mousemove="fixedRatioH" v-model="currentH" type="number" label="Высота"></v-text-field>
+      <a>({{ newMP }} МПикс)</a>
+      <v-checkbox label="Сохранить пропорции" v-model="preserveRatio"></v-checkbox>
         <template v-slot:actions>
           <v-btn
             class="ms-auto"
@@ -33,7 +37,7 @@
           <v-btn
             class="ms-auto"
             text="Ок"
-            @click="sizedialog = false"
+            @click="updateSize"
           ></v-btn>
         </template>
       </v-card>
@@ -44,7 +48,10 @@
           <td>{{ posData }}</td>
           <td>{{ colorData }}</td>
         </h2></tr></table>
+        <v-row style="padding: 20px;">
+        <v-slider v-model="scaleSlider" @update:model-value="changeImageSize" :max="300" :min="12" class="align-center" thumb-label></v-slider>
         <v-btn variant="text" @click="sizedialog = true">Изменить размер</v-btn>
+      </v-row>
   </footer>
 </template>
 
@@ -52,6 +59,9 @@
 var img = new Image();
 var imgwidth = 0;
 var imgheight = 0;
+var newimgwidth = 0;
+var newimgheight = 0;
+var scale = 1;
   export default {
   data(){
     return {
@@ -59,7 +69,14 @@ var imgheight = 0;
       image: null,
       colorData: "Цвет: ",
       posData: "Позиция: ",
+      dimData: "",
       photoLink: "",
+      scaleData: "",
+      scaleSlider: "100",
+      currentW: "",
+      currentH: "",
+      newMP: "",
+      preserveRatio: true,
     }
   },
   methods: {
@@ -79,20 +96,63 @@ var imgheight = 0;
           var width = img.width;
           var height = img.height;
           if (width > MAX_WIDTH) {
-            height = height * (MAX_WIDTH / width);
+            scale *= (MAX_WIDTH / width)
+            height *= (MAX_WIDTH / width);
             width = MAX_WIDTH;
           }
           if (height > MAX_HEIGHT) {
-            width = width * (MAX_HEIGHT / height);
+            scale *= (MAX_HEIGHT / height);
+            width *= (MAX_HEIGHT / height);
             height = MAX_HEIGHT;
           }
           imgwidth = width;
           imgheight = height;
           ctx.drawImage(img, c.width / 2 - width / 2, c.height / 2 - height / 2, width, height);
         }
+        newimgwidth = imgwidth;
+        newimgheight = imgheight;
+        this.newMP = (imgwidth * imgheight / 1000000).toFixed(2);
         document.getElementById("dim").textContent = "Размер изображения: " + [img.width, img.height].toString();
       }
       document.getElementById("upload").style.display = 'none';
+    },
+    changeImageSize() {
+      var c = document.getElementById("myCanvas");
+      var ctx = c.getContext("2d");
+      ctx.clearRect(0, 0, c.width, c.height);
+      scale = parseFloat(this.scaleSlider) / 100;
+      imgwidth = newimgwidth * parseFloat(this.scaleSlider) / 100;
+      imgheight = newimgheight * parseFloat(this.scaleSlider) / 100;
+      this.newMP = (imgwidth * imgheight / 1000000).toFixed(2);
+      ctx.drawImage(img, c.width / 2 - imgwidth / 2, c.height / 2 - imgheight / 2, imgwidth, imgheight);
+      document.getElementById("dim").textContent = "Размер изображения: " + [imgwidth.toFixed(2), imgheight.toFixed(2)].toString();
+      this.currentW = imgwidth.toFixed(2);
+      this.currentH = imgheight.toFixed(2);
+    },
+    updateSize() {
+      this.sizedialog = false;
+      var c = document.getElementById("myCanvas");
+      var ctx = c.getContext("2d");
+      ctx.clearRect(0, 0, c.width, c.height);
+      imgwidth = parseFloat(this.currentW);
+      imgheight = parseFloat(this.currentH);
+      scale = (imgwidth * imgheight) / (img.width * imgheight);
+      newimgwidth = imgwidth / scale;
+      newimgheight = imgheight / scale;
+      ctx.drawImage(img, c.width / 2 - imgwidth / 2, c.height / 2 - imgheight / 2, imgwidth, imgheight);
+      document.getElementById("dim").textContent = "Размер изображения: " + [imgwidth.toFixed(2), imgheight.toFixed(2)].toString();
+    },
+    fixedRatioW() {
+      if (this.preserveRatio) {
+        this.currentH = String(imgheight * (parseFloat(this.currentW) / imgwidth));
+      }
+      this.newMP = (parseFloat(this.currentW) * parseFloat(this.currentH) / 1000000).toFixed(2);
+    },
+    fixedRatioH() {
+      if (this.preserveRatio) {
+        this.currentW = String(imgwidth * (parseFloat(this.currentH) / imgheight));
+      }
+      this.newMP = (parseFloat(this.currentW) * parseFloat(this.currentH) / 1000000).toFixed(2);
     },
     imageFromWeb() { //Перед использованием включить https://cors-anywhere.herokuapp.com/
       this.createImage();
@@ -123,6 +183,12 @@ var imgheight = 0;
       } else {
         this.posData = "Позиция: ";
       }
+      this.scaleSlider = String(scale * 100);
+      this.scaleData = (scale * 100).toFixed(2);
+      this.dimData = String(img.width) + ", " + String(img.height) + " (" + (img.width * img.height / 1000000).toFixed(2) + " МПикс)";
+      this.newMP = (imgwidth * imgheight / 1000000).toFixed(2);
+      this.currentW = imgwidth.toFixed(2);
+      this.currentH = imgheight.toFixed(2);
     }
   }
 }
