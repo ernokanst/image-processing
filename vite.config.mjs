@@ -13,6 +13,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: "/image-processing/",
   plugins: [
     VueRouter(),
     Layouts(),
