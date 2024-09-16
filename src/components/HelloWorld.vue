@@ -188,7 +188,7 @@ var scale = 1;
       }
       if (this.sizeChoice == "Проценты") {
         if (this.preserveRatio) {
-          this.measureH = String(((imgheight / img.height).toFixed(2) * (parseFloat(this.measureW))).toFixed(2));
+          this.measureH = String(((imgheight / img.height * 100) * (parseFloat(this.measureW) / (imgwidth / img.width * 100))).toFixed(2));
         }
         this.newMP = (parseFloat(imgwidth * (parseFloat(this.measureW) / 100)) * parseFloat(imgheight * (parseFloat(this.measureH) / 100)) / 1000000).toFixed(2);
       }
@@ -202,7 +202,7 @@ var scale = 1;
       }
       if (this.sizeChoice == "Проценты") {
         if (this.preserveRatio) {
-          this.measureW = String(((imgwidth / img.width).toFixed(2) * (parseFloat(this.measureH))).toFixed(2));
+          this.measureW = String(((imgwidth / img.width * 100) * (parseFloat(this.measureH) / (imgheight / img.height * 100))).toFixed(2));
         }
         this.newMP = (parseFloat(imgwidth * (parseFloat(this.measureW) / 100)) * parseFloat(imgheight * (parseFloat(this.measureH) / 100)) / 1000000).toFixed(2);
       }
