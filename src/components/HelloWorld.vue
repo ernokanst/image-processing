@@ -210,7 +210,8 @@ var scale = 1;
     imageFromWeb() { //Перед использованием включить https://cors-anywhere.herokuapp.com/
       this.createImage();
       img.crossOrigin = "Anonymous";
-      img.src = "https://cors-anywhere.herokuapp.com/" + this.photoLink;
+      //img.src = "https://cors-anywhere.herokuapp.com/" + this.photoLink;
+      img.src = this.photoLink;
     },
     imageFromFile() {
       this.createImage();
