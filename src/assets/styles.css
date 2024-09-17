@@ -52,6 +52,14 @@ td {
     border: 2px solid #000000;
     padding: 8px;
 }
+.curves {
+    position: fixed;
+    top: 0;
+    right: 0;
+    background-color: #ffffff;
+    border: 2px solid #000000;
+    padding: 8px;
+}
 .swatch {
     width: 20px;
     height: 20px;

@@ -46,12 +46,24 @@
         <p>{{ color2 }}</p>
       </v-row>
       <v-row style="margin: 8px;">
-        <v-btn prepend-icon="mdi-help-circle-outline" variant="text" v-tooltip:bottom="'RGB – аддитивная цветовая модель, описывающая способ кодирования цвета для цветовоспроизведения с помощью трёх цветов, которые принято называть основными. Каждый параметр (красный, зеленый и синий) определяет интенсивность цвета со значением от 0 до 255.'">RGB</v-btn>
-        <v-btn prepend-icon="mdi-help-circle-outline" variant="text" v-tooltip:bottom="'Цветовое пространство XYZ моделирует цвета в соответствии с типичной чувствительностью трех типов колбочек человеческого глаза. Канал Y представляет яркость цвета. Канал Z приблизительно представляет количество синего цвета в изображении, но значение Z в цветовом пространстве XYZ не идентично значению B в цветовом пространстве RGB. Канал X не имеет четкой цветовой аналогии. Однако, если рассматривать цветовое пространство XYZ как трехмерную систему координат, то значения X лежат вдоль оси, которая ортогональна оси Y (яркость) и оси Z.'">XYZ</v-btn>
-        <v-btn prepend-icon="mdi-help-circle-outline" variant="text" v-tooltip:bottom="'Цветовое пространство L*a*b* обеспечивает более перцептивно однородное цветовое пространство, чем модель XYZ. Цвета в цветовом пространстве L*a*b* могут существовать за пределами гаммы RGB (допустимого набора цветов RGB). L* – яркость изображения, 0 указывает черный цвет, а 100 — белый. a* – количество красных или зеленых тонов в изображении, большое положительное значение a* соответствует красному/пурпурному, большое отрицательное значение a* соответствует зеленому цвету. b* – количество желтых или синих тонов в изображении, большое положительное значение b* соответствует желтому цвету, большое отрицательное значение b* соответствует синему цвету.'">Lab</v-btn>
+        <v-btn prepend-icon="mdi-help-circle-outline" variant="text"
+          v-tooltip:bottom="'RGB – аддитивная цветовая модель, описывающая способ кодирования цвета для цветовоспроизведения с помощью трёх цветов, которые принято называть основными. Каждый параметр (красный, зеленый и синий) определяет интенсивность цвета со значением от 0 до 255.'">RGB</v-btn>
+        <v-btn prepend-icon="mdi-help-circle-outline" variant="text"
+          v-tooltip:bottom="'Цветовое пространство XYZ моделирует цвета в соответствии с типичной чувствительностью трех типов колбочек человеческого глаза. Канал Y представляет яркость цвета. Канал Z приблизительно представляет количество синего цвета в изображении, но значение Z в цветовом пространстве XYZ не идентично значению B в цветовом пространстве RGB. Канал X не имеет четкой цветовой аналогии. Однако, если рассматривать цветовое пространство XYZ как трехмерную систему координат, то значения X лежат вдоль оси, которая ортогональна оси Y (яркость) и оси Z.'">XYZ</v-btn>
+        <v-btn prepend-icon="mdi-help-circle-outline" variant="text"
+          v-tooltip:bottom="'Цветовое пространство L*a*b* обеспечивает более перцептивно однородное цветовое пространство, чем модель XYZ. Цвета в цветовом пространстве L*a*b* могут существовать за пределами гаммы RGB (допустимого набора цветов RGB). L* – яркость изображения, 0 указывает черный цвет, а 100 — белый. a* – количество красных или зеленых тонов в изображении, большое положительное значение a* соответствует красному/пурпурному, большое отрицательное значение a* соответствует зеленому цвету. b* – количество желтых или синих тонов в изображении, большое положительное значение b* соответствует желтому цвету, большое отрицательное значение b* соответствует синему цвету.'">Lab</v-btn>
       </v-row>
       <p>{{ contrast }}</p>
       <v-btn variant="text" prepend-icon="mdi-close" @click="closePicker">Закрыть</v-btn>
+    </div>
+    <div class="curves" id="curves" style="display: none;">
+      <h3>Кривые</h3>
+      <v-col>
+        <canvas id="selectorR" height="256" width="256"></canvas>
+        <canvas id="selectorG" height="256" width="256"></canvas>
+        <canvas id="selectorB" height="256" width="256"></canvas>
+      </v-col>
+      <v-btn variant="text" prepend-icon="mdi-close" @click="closeCurves">Закрыть</v-btn>
     </div>
     <table>
       <tr>
@@ -61,6 +73,7 @@
               <v-btn icon="mdi-hand-back-right-outline" v-tooltip:top="'Рука: передвигайте изображение'"></v-btn>
               <v-btn icon="mdi-eyedropper" v-tooltip:top="'Пипетка: получайте информацию о цветах'"
                 @click="openPicker"></v-btn>
+              <v-btn icon="mdi-chart-bell-curve-cumulative" v-tooltip:top="'Кривые: управляйте цветами'" @click="openCurves"></v-btn>
             </v-btn-toggle>
           </td>
           <td id="dim">Размер изображения: </td>
@@ -98,34 +111,35 @@ document.body.onmouseup = function () {
 }
 addEventListener("wheel", (evt) => {
   if (evt.altKey) {
-        var c = document.getElementById("myCanvas");
-        var ctx = c.getContext("2d");
-        var newimgpos = { x: imgpos.x + evt.deltaX, y: imgpos.y + evt.deltaY };
-        if (newimgpos.x < 50 - imgwidth) {
-          newimgpos.x = 50 - imgwidth;
-        }
-        if (newimgpos.x > c.width - 50) {
-          newimgpos.x = c.width - 50;
-        }
-        if (newimgpos.y < 50 - imgheight) {
-          newimgpos.y = 50 - imgheight;
-        }
-        if (newimgpos.y > c.height - 50) {
-          newimgpos.y = c.height - 50;
-        }
-        c.style.imageRendering = "pixelated";
-        ctx.clearRect(0, 0, c.width, c.height);
-        ctx.drawImage(img, newimgpos.x, newimgpos.y, imgwidth, imgheight);
-        imgpos = newimgpos;
-      }
+    var c = document.getElementById("myCanvas");
+    var ctx = c.getContext("2d");
+    var newimgpos = { x: imgpos.x + evt.deltaX, y: imgpos.y + evt.deltaY };
+    if (newimgpos.x < 50 - imgwidth) {
+      newimgpos.x = 50 - imgwidth;
+    }
+    if (newimgpos.x > c.width - 50) {
+      newimgpos.x = c.width - 50;
+    }
+    if (newimgpos.y < 50 - imgheight) {
+      newimgpos.y = 50 - imgheight;
+    }
+    if (newimgpos.y > c.height - 50) {
+      newimgpos.y = c.height - 50;
+    }
+    c.style.imageRendering = "pixelated";
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, newimgpos.x, newimgpos.y, imgwidth, imgheight);
+    imgpos = newimgpos;
+  }
 });
+var Curve;
 export default {
   data() {
     return {
       sizedialog: false,
       image: null,
-      colorData: "Цвет: ",
-      posData: "Позиция: ",
+      colorData: "",
+      posData: "",
       dimData: "",
       photoLink: "",
       scaleData: "",
@@ -155,6 +169,8 @@ export default {
       c.width = window.innerWidth;
       c.height = window.innerHeight - $("footer").height();
       img.onload = function () {
+        newimgwidth = img.width;
+        newimgheight = img.height;
         if ((img.width <= (c.width - 100)) && (img.height <= (c.height - 100))) {
           imgpos = { x: c.width / 2 - img.width / 2, y: c.height / 2 - img.height / 2 };
           ctx.drawImage(img, imgpos.x, imgpos.y);
@@ -175,17 +191,19 @@ export default {
             width *= (MAX_HEIGHT / height);
             height = MAX_HEIGHT;
           }
-          imgwidth = img.width;
-          imgheight = img.height;
+          scale = (width * height) / (img.width * height);
+          this.scaleSlider = scale;
           imgpos = { x: c.width / 2 - width / 2, y: c.height / 2 - height / 2 };
-          ctx.drawImage(img, imgpos.x, imgpos.y, width, height);
+          imgwidth = width;
+          imgheight = height;
+          ctx.drawImage(img, imgpos.x, imgpos.y, imgwidth, imgheight);
+          document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
+          this.changeMeasure();
         }
-        newimgwidth = imgwidth;
-        newimgheight = imgheight;
         this.newMP = (imgwidth * imgheight / 1000000).toFixed(2);
-        document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(img.width), Math.floor(img.height)].toString();
+        document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
         var sizes = [];
-        sizes[0] = ""
+        sizes[0] = "";
       }
       document.getElementById("upload").style.display = "none";
     },
@@ -300,6 +318,14 @@ export default {
       var x = document.getElementById("picker");
       x.style.display = "none";
     },
+    openCurves() {
+      var x = document.getElementById("curves");
+      x.style.display = "block";
+    },
+    closeCurves() {
+      var x = document.getElementById("curves");
+      x.style.display = "none";
+    },
     getColor(evt) {
       if (this.toggle == 1) {
         var c = document.getElementById("myCanvas");
@@ -357,6 +383,9 @@ export default {
       return "Lab(" + L.toFixed(2) + "%, " + a.toFixed(2) + "%, " + b.toFixed(2) + "%)";
     },
     getPixelData(evt) {
+      if (this.toggle != 2) {
+        this.closeCurves();
+      }
       var c = document.getElementById("myCanvas");
       var ctx = c.getContext("2d");
       var pos = this.getMousePos(c, evt);
