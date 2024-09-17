@@ -45,6 +45,11 @@
         <div class="swatch" :style="{ backgroundColor: swatch2 }"></div>
         <p>{{ color2 }}</p>
       </v-row>
+      <v-row style="margin: 8px;">
+        <v-btn prepend-icon="mdi-help-circle-outline" variant="text" v-tooltip:bottom="'RGB – аддитивная цветовая модель, описывающая способ кодирования цвета для цветовоспроизведения с помощью трёх цветов, которые принято называть основными. Каждый параметр (красный, зеленый и синий) определяет интенсивность цвета со значением от 0 до 255.'">RGB</v-btn>
+        <v-btn prepend-icon="mdi-help-circle-outline" variant="text" v-tooltip:bottom="'Цветовое пространство XYZ моделирует цвета в соответствии с типичной чувствительностью трех типов колбочек человеческого глаза. Канал Y представляет яркость цвета. Канал Z приблизительно представляет количество синего цвета в изображении, но значение Z в цветовом пространстве XYZ не идентично значению B в цветовом пространстве RGB. Канал X не имеет четкой цветовой аналогии. Однако, если рассматривать цветовое пространство XYZ как трехмерную систему координат, то значения X лежат вдоль оси, которая ортогональна оси Y (яркость) и оси Z.'">XYZ</v-btn>
+        <v-btn prepend-icon="mdi-help-circle-outline" variant="text" v-tooltip:bottom="'Цветовое пространство L*a*b* обеспечивает более перцептивно однородное цветовое пространство, чем модель XYZ. Цвета в цветовом пространстве L*a*b* могут существовать за пределами гаммы RGB (допустимого набора цветов RGB). L* – яркость изображения, 0 указывает черный цвет, а 100 — белый. a* – количество красных или зеленых тонов в изображении, большое положительное значение a* соответствует красному/пурпурному, большое отрицательное значение a* соответствует зеленому цвету. b* – количество желтых или синих тонов в изображении, большое положительное значение b* соответствует желтому цвету, большое отрицательное значение b* соответствует синему цвету.'">Lab</v-btn>
+      </v-row>
       <p>{{ contrast }}</p>
       <v-btn variant="text" prepend-icon="mdi-close" @click="closePicker">Закрыть</v-btn>
     </div>
@@ -91,6 +96,29 @@ document.body.onmousedown = function () {
 document.body.onmouseup = function () {
   mouseDown = false;
 }
+addEventListener("wheel", (evt) => {
+  if (evt.altKey) {
+        var c = document.getElementById("myCanvas");
+        var ctx = c.getContext("2d");
+        var newimgpos = { x: imgpos.x + evt.deltaX, y: imgpos.y + evt.deltaY };
+        if (newimgpos.x < 50 - imgwidth) {
+          newimgpos.x = 50 - imgwidth;
+        }
+        if (newimgpos.x > c.width - 50) {
+          newimgpos.x = c.width - 50;
+        }
+        if (newimgpos.y < 50 - imgheight) {
+          newimgpos.y = 50 - imgheight;
+        }
+        if (newimgpos.y > c.height - 50) {
+          newimgpos.y = c.height - 50;
+        }
+        c.style.imageRendering = "pixelated";
+        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, newimgpos.x, newimgpos.y, imgwidth, imgheight);
+        imgpos = newimgpos;
+      }
+});
 export default {
   data() {
     return {
