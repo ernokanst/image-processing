@@ -58,12 +58,27 @@
     </div>
     <div class="curves" id="curves" style="display: none;">
       <h3>Кривые</h3>
-      <v-col>
-        <canvas id="selectorR" height="256" width="256"></canvas>
-        <canvas id="selectorG" height="256" width="256"></canvas>
-        <canvas id="selectorB" height="256" width="256"></canvas>
-      </v-col>
-      <v-btn variant="text" prepend-icon="mdi-close" @click="closeCurves">Закрыть</v-btn>
+      <v-row>
+        <v-col>
+          <v-number-input :max="255" :min="0" @input="updateDots" v-model="posx1" type="number"
+            label="X1"></v-number-input>
+          <v-number-input :max="255" :min="0" @input="updateDots" v-model="posy1" type="number"
+            label="Y1"></v-number-input>
+        </v-col>
+        <v-col>
+          <v-number-input :max="255" :min="0" @input="updateDots" v-model="posx2" type="number"
+            label="X2"></v-number-input>
+          <v-number-input :max="255" :min="0" @input="updateDots" v-model="posy2" type="number"
+            label="Y2"></v-number-input>
+        </v-col>
+      </v-row>
+      <canvas id="selector" class="curve" @mousemove="checkDots" height="256" width="256"></canvas>
+      <v-checkbox label="Предпросмотр" id="preview" v-model="preview" @click="checkPreview"></v-checkbox>
+      <v-row style="margin: 8px;">
+        <v-btn variant="text" prepend-icon="mdi-close" @click="closeCurves">Закрыть</v-btn>
+        <v-btn variant="text" prepend-icon="mdi-reload" @click="resetCurves">Сброс</v-btn>
+        <v-btn variant="text" prepend-icon="mdi-check" @click="applyCurves">Применить</v-btn>
+      </v-row>
     </div>
     <table>
       <tr>
@@ -73,7 +88,8 @@
               <v-btn icon="mdi-hand-back-right-outline" v-tooltip:top="'Рука: передвигайте изображение'"></v-btn>
               <v-btn icon="mdi-eyedropper" v-tooltip:top="'Пипетка: получайте информацию о цветах'"
                 @click="openPicker"></v-btn>
-              <v-btn icon="mdi-chart-bell-curve-cumulative" v-tooltip:top="'Кривые: управляйте цветами'" @click="openCurves"></v-btn>
+              <v-btn icon="mdi-chart-bell-curve-cumulative" v-tooltip:top="'Кривые: управляйте цветами'"
+                @click="openCurves"></v-btn>
             </v-btn-toggle>
           </td>
           <td id="dim">Размер изображения: </td>
@@ -103,6 +119,13 @@ var luma1 = null;
 var luma2 = null;
 var mouseDown = false;
 var initPos = null;
+var curvedImg = null;
+var oldCCpoints = [0, 0, 1, 1];
+var colorHist = {
+    r: new Array(256).fill(0),
+    g: new Array(256).fill(0),
+    b: new Array(256).fill(0),
+  };
 document.body.onmousedown = function () {
   mouseDown = true;
 }
@@ -112,7 +135,7 @@ document.body.onmouseup = function () {
 addEventListener("wheel", (evt) => {
   if (evt.altKey) {
     var c = document.getElementById("myCanvas");
-    var ctx = c.getContext("2d");
+    var ctx = c.getContext("2d", { willReadFrequently: true });
     var newimgpos = { x: imgpos.x + evt.deltaX, y: imgpos.y + evt.deltaY };
     if (newimgpos.x < 50 - imgwidth) {
       newimgpos.x = 50 - imgwidth;
@@ -130,9 +153,351 @@ addEventListener("wheel", (evt) => {
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.drawImage(img, newimgpos.x, newimgpos.y, imgwidth, imgheight);
     imgpos = newimgpos;
+    checkCurve();
   }
 });
-var Curve;
+var cModified = document.createElement('canvas');
+function ColorCurve(canvas, callback) {
+  'use strict';
+
+  this.points = [];
+  this.currentPoint = -1;
+  this.c = document.getElementById(canvas);
+  this.ctx = this.c.getContext("2d", { willReadFrequently: true });
+  this.height = this.c.height;
+  this.width = this.c.width;
+  this.redraw = 0;
+  this.values = [];
+  this.rgb = [];
+  this.onChange = callback;
+
+  if (this.height != this.width) {
+    console.error("ERROR: Canvas must have same width and height.");
+    return undefined;
+  }
+
+  this.points.push({ x: 0, y: 0 });
+  this.points.push({ x: 1.0, y: 1.0 });
+
+  var me = this;
+
+  this.c.addEventListener('mousedown', function (ev) {
+    me.mouseDown(ev);
+  }, false);
+
+  this.c.addEventListener('mouseup', function (ev) {
+    me.mouseUp(ev);
+    me.draw();
+  }, false);
+
+  this.c.addEventListener('mouseout', function (ev) {
+    me.mouseUp(ev);
+    me.draw();
+  }, false);
+
+  this.c.addEventListener('mousemove', function (ev) {
+    me.mouseMove(ev);
+    if (me.redraw == 1) {
+      me.draw();
+      me.updateValues();
+      me.redraw = 0;
+    }
+  }, false);
+
+  this.draw();
+  this.updateValues();
+}
+ColorCurve.prototype.updateValues = function () {
+  'use strict';
+
+  this.rgb.splice(0, this.rgb.length);
+  for (var i = 0; i < 256; i++) this.rgb.push(Math.round(this.getY(i / 255.0) * 255));
+
+  if (typeof this.onChange !== "undefined") {
+    this.onChange();
+  }
+
+}
+ColorCurve.prototype.isEqual = function (p1, p2) {
+  'use strict';
+
+  if (p1.x == p2.x && p1.y == p2.y) {
+    return true;
+  } else {
+    return false;
+  }
+
+}
+ColorCurve.prototype.draw = function () {
+  'use strict';
+
+  var p1, p4;
+
+  this.values.splice(0, this.values.length);
+  this.ctx.clearRect(0, 0, this.width, this.height);
+  this.drawColorHist();
+  this.drawGrid();
+
+  for (var i = 0; i < this.points.length - 1; i++) {
+    if (i < 1) {
+      p1 = this.points[0];
+    } else {
+      p1 = this.points[i - 1];
+    }
+    if (i + 2 > this.points.length - 1) {
+      p4 = this.points[i + 1];
+    } else {
+      p4 = this.points[i + 2];
+    }
+    this.quadratic(p1, this.points[i], this.points[i + 1], p4);
+  }
+  this.drawPoints();
+
+}
+ColorCurve.prototype.drawGrid = function () {
+  'use strict';
+
+  var space = this.width / 4.0;
+
+  this.ctx.beginPath();
+  this.ctx.lineWidth = 1;
+  this.ctx.strokeStyle = '#aaaaaa';
+
+  for (var i = 0; i < this.height - space; i += space) {
+    this.ctx.moveTo(0, i + space); this.ctx.lineTo(this.height, i + space);
+  }
+  for (var i = 0; i < this.height - space; i += space) {
+    this.ctx.moveTo(i + space, 0); this.ctx.lineTo(i + space, this.height);
+  }
+  this.ctx.stroke();
+}
+ColorCurve.prototype.drawColorHist = function () {
+  var colors = ['rgb(255, 0, 0)', 'rgb(0, 255, 0)', 'rgb(0, 0, 255)'];
+  var histograms = [colorHist.r, colorHist.g, colorHist.b];
+  histograms.forEach((hist, index) => {
+    this.ctx.fillStyle = colors[index];
+    hist.forEach((count, i) => {
+      var height = (count / Math.max(...colorHist.r, ...colorHist.g, ...colorHist.b)) * this.c.height;
+      this.ctx.fillRect(i, this.c.height - height, 1, height);
+    });
+  });
+}
+ColorCurve.prototype.quadratic = function (p1, p2, p3, p4) {
+  'use strict';
+
+  var x0, x1, x2, x3, y0, y1, y2, y3, dx, dy;
+
+  this.ctx.strokeStyle = '#000000';
+  this.ctx.lineWidth = 1.5;
+  var slope = 0;
+
+  x0 = p2.x;
+  x3 = p3.x;
+
+  y0 = p2.y;
+  y3 = p3.y;
+
+  dx = x3 - x0;
+  dy = y3 - y0;
+
+  x1 = ((2.0 * x0) / 3.0) + (x3 / 3.0)
+  x2 = (x0 / 3.0) + ((2.0 * x3) / 3.0);
+
+
+  if (this.isEqual(p1, p2) && this.isEqual(p3, p4)) {
+    y1 = y0 + (dy / 3.0);
+    y2 = y0 + ((dy * 2.0) / 3.0);
+  }
+  if (this.isEqual(p1, p2) && !this.isEqual(p3, p4)) {
+
+    slope = ((p4.y) - y0) / (p4.x - x0);
+    y2 = y3 - ((slope * dx) / 3.0);
+    y1 = y0 + ((y2 - y0) / 2.0);
+
+  }
+  if (!this.isEqual(p1, p2) && this.isEqual(p3, p4)) {
+    slope = (y3 - (p1.y)) / (x3 - p1.x);
+
+    y1 = y0 + ((slope * dx) / 3.0);
+    y2 = y3 + ((y1 - y3) / 2.0);
+  }
+
+  if (!this.isEqual(p1, p2) && !this.isEqual(p3, p4)) {
+    slope = (y3 - (p1.y)) / (x3 - p1.x);
+    y1 = y0 + ((slope * dx) / 3.0);
+    slope = ((p4.y) - y0) / (p4.x - x0);
+    y2 = y3 - ((slope * dx) / 3.0);
+  }
+
+  this.ctx.beginPath();
+  this.ctx.moveTo(x0 * this.width, this.height - (y0 * this.height));
+
+  var step = (x3 - x0) / 20.0;
+  var tx = x0;
+
+  for (var i = 0.0; i <= 1.05; i += 0.05) {
+
+    var ty = (y0 * Math.pow((1 - i), 3)) +
+      (3 * y1 * Math.pow((1 - i), 2) * i) +
+      (3 * y2 * (1 - i) * i * i) +
+      (y3 * i * i * i);
+
+    this.ctx.lineTo(tx * this.width, this.height - (ty * this.height));
+    this.values.push({ x: tx, y: ty });
+    tx = tx + step;
+
+  }
+
+  this.ctx.moveTo(0, this.height - (this.points[0].y * this.height));
+  this.ctx.lineTo(this.points[0].x * this.width, this.height - (this.points[0].y * this.height));
+
+  this.ctx.moveTo(this.points[1].x * this.width, this.height - (this.points[1].y * this.height));
+  this.ctx.lineTo(this.width, this.height - (this.points[1].y * this.height));
+
+  this.ctx.stroke();
+  return true;
+}
+ColorCurve.prototype.drawPoints = function () {
+  'use strict';
+
+  this.ctx.fillStyle = '#ff0000';
+  this.ctx.beginPath();
+
+  for (var i = 0; i < this.points.length; i++) {
+    this.ctx.moveTo(this.points[i].x * this.width, this.height - (this.points[i].y * this.height));
+    this.ctx.arc(this.points[i].x * this.width, this.height - (this.points[i].y * this.height), 3, 0, 2 * Math.PI, false);
+  }
+  this.ctx.fill();
+}
+ColorCurve.prototype.mouseDown = function (event) {
+  'use strict';
+
+  if (!event) var event = window.event;
+  var rect = this.c.getBoundingClientRect();
+  var x = (event.clientX - rect.left) / this.width, y = (event.clientY - rect.top) / this.height;
+
+  var dis = 10000;
+  var punto = -1;
+
+  for (var i = 0; i < this.points.length; i++) {
+    var x1 = x - this.points[i].x;
+    var y1 = y - (1.0 - this.points[i].y);
+
+    var tdis = x1 * x1 + y1 * y1;
+    var tdis = Math.sqrt(tdis);
+
+    if (tdis < dis) {
+      dis = tdis;
+      punto = i;
+    }
+  }
+  this.currentPoint = (dis < 8.0) ? punto : this.currentPoint;
+}
+ColorCurve.prototype.mouseUp = function (event) {
+  'use strict';
+  if (this.currentPoint != -1) {
+    this.updateValues();
+  }
+  this.currentPoint = -1;
+}
+ColorCurve.prototype.mouseMove = function (event) {
+
+  'use strict';
+
+  var prevx, nextx, prevy, nexty;
+
+  if (this.currentPoint == -1) return;
+
+  if (this.currentPoint > 0) prevx = this.points[this.currentPoint - 1].x; else prevx = 0;
+  if (this.currentPoint == this.points.length - 1) nextx = 1.0; else nextx = this.points[this.currentPoint + 1].x;
+  if (this.currentPoint > 0) prevy = this.points[this.currentPoint - 1].y; else prevy = 0;
+  if (this.currentPoint == this.points.length - 1) nexty = 1.0; else nexty = this.points[this.currentPoint + 1].y;
+
+  var x = (event.pageX - this.c.offsetLeft) / this.width;
+  var y = 1.0 - ((event.pageY - this.c.offsetTop) / this.height);
+
+  if (x > prevx && x < nextx && y > prevy && y < nexty) {
+    this.points[this.currentPoint].x = x;
+    this.points[this.currentPoint].y = y;
+
+    this.redraw = 1;
+  }
+}
+ColorCurve.prototype.getY = function (xpos) {
+  'use strict';
+
+  if (xpos < this.values[0].x) xpos = this.values[0].x;
+  if (xpos > this.values[this.values.length - 1].x) xpos = this.values[this.values.length - 1].x;
+
+  for (var i = 0; i < this.values.length - 2; i++) {
+    if (xpos >= this.values[i].x && xpos < this.values[i + 1].x) break;
+  }
+  var valuea = (xpos - this.values[i].x) / (this.values[i + 1].x - this.values[i].x);
+  var valueb = valuea * (this.values[i + 1].y - this.values[i].y);
+
+  var ret = this.values[i].y + valueb;
+
+  if (ret < 0.0) return 0.0;
+  if (ret > 1.0) return 1.0;
+
+  return ret;
+}
+var Filter = Filter || {};
+var CC;
+Filter.Init = function () {
+  if (imgheight > imgwidth) {
+    cModified.height = imgheight;
+    cModified.width = imgheight;
+  } else {
+    cModified.height = imgwidth;
+    cModified.width = imgwidth;
+  }
+  var c = document.getElementById("myCanvas");
+  var ctx = c.getContext("2d", { willReadFrequently: true });
+  var imageData = ctx.getImageData(imgpos.x, imgpos.y, imgwidth, imgheight);
+  this.numPixels = imageData.width * imageData.height;
+  this.originalPixels = imageData.data;
+  var ctx = cModified.getContext("2d", { willReadFrequently: true });
+  ctx.putImageData(imageData, 0, 0);
+  this.canvas = cModified;
+  this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
+}
+Filter.applyFilter = function () {
+  if (CC == undefined) return;
+  var imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+  var pix = imageData.data;
+  for (var i = 0; i < pix.length; i++) {
+    pix[i] = CC.rgb[Filter.originalPixels[i]];
+  }
+  colorHist = {
+    r: new Array(256).fill(0),
+    g: new Array(256).fill(0),
+    b: new Array(256).fill(0),
+  };
+  for (var i = 0; i < pix.length; i += 4) {
+    colorHist.r[pix[i]]++;
+    colorHist.g[pix[i + 1]]++;
+    colorHist.b[pix[i + 2]]++;
+  }
+  Filter.ctx.putImageData(imageData, 0, 0);
+  curvedImg = this.ctx.getImageData(0, 0, imgwidth, imgheight);
+  if (document.getElementById("preview").checked) {
+    drawFilter();
+  }
+}
+function drawFilter() {
+  var c = document.getElementById("myCanvas");
+  var ctx = c.getContext("2d", { willReadFrequently: true });
+  c.style.imageRendering = "pixelated";
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.putImageData(curvedImg, imgpos.x, imgpos.y);
+}
+function checkCurve() {
+  if (CC == undefined) return;
+  Filter.Init();
+  Filter.applyFilter();
+  drawFilter();
+}
 export default {
   data() {
     return {
@@ -159,12 +524,17 @@ export default {
       swatch1: "",
       swatch2: "",
       contrast: "",
+      preview: false,
+      posx1: 0,
+      posy1: 0,
+      posx2: 255,
+      posy2: 255,
     }
   },
   methods: {
     createImage() {
       var c = document.getElementById("myCanvas");
-      var ctx = c.getContext("2d");
+      var ctx = c.getContext("2d", { willReadFrequently: true });
       c.style.imageRendering = "pixelated";
       c.width = window.innerWidth;
       c.height = window.innerHeight - $("footer").height();
@@ -198,12 +568,17 @@ export default {
           imgheight = height;
           ctx.drawImage(img, imgpos.x, imgpos.y, imgwidth, imgheight);
           document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
-          this.changeMeasure();
         }
         this.newMP = (imgwidth * imgheight / 1000000).toFixed(2);
         document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
         var sizes = [];
         sizes[0] = "";
+        var imgdata = ctx.getImageData(imgpos.x, imgpos.y, imgwidth, imgheight).data;
+        for (var i = 0; i < imgdata.length; i += 4) {
+          colorHist.r[imgdata[i]]++;
+          colorHist.g[imgdata[i + 1]]++;
+          colorHist.b[imgdata[i + 2]]++;
+        }
       }
       document.getElementById("upload").style.display = "none";
     },
@@ -224,7 +599,7 @@ export default {
     },
     changeImageSize() {
       var c = document.getElementById("myCanvas");
-      var ctx = c.getContext("2d");
+      var ctx = c.getContext("2d", { willReadFrequently: true });
       c.style.imageRendering = "pixelated";
       ctx.clearRect(0, 0, c.width, c.height);
       scale = parseFloat(this.scaleSlider) / 100;
@@ -235,6 +610,7 @@ export default {
       ctx.drawImage(img, imgpos.x, imgpos.y, imgwidth, imgheight);
       document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
       this.changeMeasure();
+      checkCurve();
     },
     updateSize() {
       if (parseFloat(this.measureW) <= 0 || parseFloat(this.measureH) <= 0) {
@@ -243,7 +619,7 @@ export default {
       }
       this.sizedialog = false;
       var c = document.getElementById("myCanvas");
-      var ctx = c.getContext("2d");
+      var ctx = c.getContext("2d", { willReadFrequently: true });
       c.style.imageRendering = "pixelated";
       ctx.clearRect(0, 0, c.width, c.height);
       if (this.sizeChoice == "Пиксели") {
@@ -260,6 +636,7 @@ export default {
       newimgwidth = imgwidth / scale;
       newimgheight = imgheight / scale;
       ctx.drawImage(img, imgpos.x, imgpos.y, imgwidth, imgheight);
+      checkCurve();
       document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
     },
     fixedRatioW() {
@@ -317,19 +694,57 @@ export default {
     closePicker() {
       var x = document.getElementById("picker");
       x.style.display = "none";
+      if (this.toggle == 1) this.toggle = -1;
     },
     openCurves() {
       var x = document.getElementById("curves");
       x.style.display = "block";
+      this.curveStart();
     },
     closeCurves() {
+      CC.points[0].x = oldCCpoints[0];
+      CC.points[0].y = oldCCpoints[1];
+      CC.points[1].x = oldCCpoints[2];
+      CC.points[1].y = oldCCpoints[3];
+      CC.draw();
+      CC.updateValues();
+      this.checkDots();
+      checkCurve();
       var x = document.getElementById("curves");
       x.style.display = "none";
+      if (this.toggle == 2) this.toggle = -1;
+    },
+    resetCurves() {
+      CC.points[0].x = 0;
+      CC.points[0].y = 0;
+      CC.points[1].x = 1;
+      CC.points[1].y = 1;
+      CC.draw();
+      CC.updateValues();
+      this.checkDots();
+      checkCurve();
+    },
+    applyCurves() {
+      Filter.applyFilter();
+      drawFilter();
+      oldCCpoints[0] = CC.points[0].x;
+      oldCCpoints[1] = CC.points[0].y;
+      oldCCpoints[2] = CC.points[1].x;
+      oldCCpoints[3] = CC.points[1].y;
+      var x = document.getElementById("curves");
+      x.style.display = "none";
+      if (this.toggle == 2) this.toggle = -1;
+    },
+    curveStart() {
+      if (CC == undefined) {
+        CC = new ColorCurve('selector', function () { Filter.applyFilter(); });
+      }
+      Filter.Init();
     },
     getColor(evt) {
       if (this.toggle == 1) {
         var c = document.getElementById("myCanvas");
-        var ctx = c.getContext("2d");
+        var ctx = c.getContext("2d", { willReadFrequently: true });
         var pos = this.getMousePos(c, evt);
         if ((pos.x >= imgpos.x) && (pos.x < imgpos.x + imgwidth) && (pos.y >= imgpos.y) && (pos.y < imgpos.y + imgheight)) {
           var pixelData = ctx.getImageData(pos.x, pos.y, 1, 1);
@@ -383,17 +798,15 @@ export default {
       return "Lab(" + L.toFixed(2) + "%, " + a.toFixed(2) + "%, " + b.toFixed(2) + "%)";
     },
     getPixelData(evt) {
-      if (this.toggle != 2) {
-        this.closeCurves();
-      }
       var c = document.getElementById("myCanvas");
-      var ctx = c.getContext("2d");
+      var ctx = c.getContext("2d", { willReadFrequently: true });
       var pos = this.getMousePos(c, evt);
       var pixelData = ctx.getImageData(pos.x, pos.y, 1, 1);
       if (this.toggle == 0) {
         if (!mouseDown) {
           imgpos = { x: imgpos.x + (pos.x - initPos.x), y: imgpos.y + (pos.y - initPos.y) };
           initPos = null;
+          checkCurve();
         }
         if (mouseDown) {
           if (initPos == null) {
@@ -430,16 +843,64 @@ export default {
       this.changeMeasure();
     },
     saveImage() {
+      var c = document.getElementById("myCanvas");
+      var ctx = c.getContext("2d", { willReadFrequently: true });
+      var imageData = ctx.getImageData(imgpos.x, imgpos.y, imgwidth, imgheight);
       var c = document.createElement("canvas");
-      var ctx = c.getContext("2d");
+      var ctx = c.getContext("2d", { willReadFrequently: true });
       c.style.imageRendering = "pixelated";
       c.width = imgwidth
       c.height = imgheight
-      ctx.drawImage(img, 0, 0, imgwidth, imgheight);
+      ctx.putImageData(imageData, 0, 0);
       var link = document.createElement("a");
       link.download = "image.png";
       link.href = c.toDataURL()
       link.click();
+    },
+    checkPreview() {
+      if (document.getElementById("preview").checked) {
+        Filter.applyFilter();
+      } else {
+        var tmp = [CC.points[0].x, CC.points[0].y, CC.points[1].x, CC.points[1].y];
+        CC.points[0].x = oldCCpoints[0];
+        CC.points[0].y = oldCCpoints[1];
+        CC.points[1].x = oldCCpoints[2];
+        CC.points[1].y = oldCCpoints[3];
+        CC.draw();
+        CC.updateValues();
+        Filter.applyFilter();
+        drawFilter();
+        CC.points[0].x = tmp[0];
+        CC.points[0].y = tmp[1];
+        CC.points[1].x = tmp[2];
+        CC.points[1].y = tmp[3];
+        CC.draw();
+        CC.updateValues();
+      }
+    },
+    checkDots() {
+      if (CC == undefined) return;
+      this.posx1 = Math.ceil(CC.points[0].x * 255);
+      this.posy1 = Math.ceil(CC.points[0].y * 255);
+      this.posx2 = Math.ceil(CC.points[1].x * 255);
+      this.posy2 = Math.ceil(CC.points[1].y * 255);
+    },
+    updateDots() {
+      if (CC == undefined) return;
+      if (this.posx1 < 0) this.posx1 = 0;
+      if (this.posy1 < 0) this.posy1 = 0;
+      if (this.posx2 > 255) this.posx2 = 255;
+      if (this.posy2 > 255) this.posy2 = 255;
+      if (this.posx1 > this.posx2) this.posx1 = this.posx2 - 1;
+      if (this.posy1 > this.posy2) this.posy1 = this.posy2 - 1;
+      if (this.posx2 < this.posx1) this.posx2 = this.posx1 + 1;
+      if (this.posy2 < this.posy1) this.posy2 = this.posy1 + 1;
+      CC.points[0].x = this.posx1 / 255;
+      CC.points[0].y = this.posy1 / 255;
+      CC.points[1].x = this.posx2 / 255;
+      CC.points[1].y = this.posy2 / 255;
+      CC.draw();
+      CC.updateValues();
     }
   }
 }
