@@ -37,14 +37,29 @@
   <footer>
     <div class="picker" id="picker" style="display: none;">
       <h3>Пипетка</h3>
-      <v-row style="margin: 8px;">
-        <div class="swatch" :style="{ backgroundColor: swatch1 }"></div>
-        <p>{{ color1 }}</p>
-      </v-row>
-      <v-row style="margin: 8px;">
-        <div class="swatch" :style="{ backgroundColor: swatch2 }"></div>
-        <p>{{ color2 }}</p>
-      </v-row>
+      <table class="picker">
+        <tr class="picker">
+          <td class="picker"></td>
+          <td class="picker">Позиция</td>
+          <td class="picker">RGB</td>
+          <td class="picker">XYZ</td>
+          <td class="picker">Lab</td>
+        </tr>
+        <tr class="picker">
+          <td class="picker"><div class="swatch" :style="{ backgroundColor: swatch1 }"></div></td>
+          <td class="picker">{{ pos1 }}</td>
+          <td class="picker">{{ rgb1 }}</td>
+          <td class="picker">{{ xyz1 }}</td>
+          <td class="picker">{{ lab1 }}</td>
+        </tr>
+        <tr class="picker">
+          <td class="picker"><div class="swatch" :style="{ backgroundColor: swatch2 }"></div></td>
+          <td class="picker">{{ pos2 }}</td>
+          <td class="picker">{{ rgb2 }}</td>
+          <td class="picker">{{ xyz2 }}</td>
+          <td class="picker">{{ lab2 }}</td>
+        </tr>
+      </table>
       <v-row style="margin: 8px;">
         <v-btn prepend-icon="mdi-help-circle-outline" variant="text"
           v-tooltip:bottom="'RGB – аддитивная цветовая модель, описывающая способ кодирования цвета для цветовоспроизведения с помощью трёх цветов, которые принято называть основными. Каждый параметр (красный, зеленый и синий) определяет интенсивность цвета со значением от 0 до 255.'">RGB</v-btn>
@@ -80,10 +95,10 @@
         <v-btn variant="text" prepend-icon="mdi-check" @click="applyCurves">Применить</v-btn>
       </v-row>
     </div>
-    <table>
-      <tr>
+    <table class="info">
+      <tr class="info">
         <h2>
-          <td>
+          <td class="info">
             <v-btn-toggle v-model="toggle" variant="outlined" divided>
               <v-btn icon="mdi-hand-back-right-outline" v-tooltip:top="'Рука: передвигайте изображение'"></v-btn>
               <v-btn icon="mdi-eyedropper" v-tooltip:top="'Пипетка: получайте информацию о цветах'"
@@ -92,9 +107,9 @@
                 @click="openCurves"></v-btn>
             </v-btn-toggle>
           </td>
-          <td id="dim">Размер изображения: </td>
-          <td>Позиция: {{ posData }}</td>
-          <td>Цвет: {{ colorData }}</td>
+          <td id="dim" class="info">Размер изображения: </td>
+          <td class="info">Позиция: {{ posData }}</td>
+          <td class="info">Цвет: {{ colorData }}</td>
         </h2>
       </tr>
     </table>
@@ -122,10 +137,10 @@ var initPos = null;
 var curvedImg = null;
 var oldCCpoints = [0, 0, 1, 1];
 var colorHist = {
-    r: new Array(256).fill(0),
-    g: new Array(256).fill(0),
-    b: new Array(256).fill(0),
-  };
+  r: new Array(256).fill(0),
+  g: new Array(256).fill(0),
+  b: new Array(256).fill(0),
+};
 document.body.onmousedown = function () {
   mouseDown = true;
 }
@@ -519,8 +534,14 @@ export default {
       interMethods: ["Ближайшего соседа"],
       interExplain: "Для каждого пикселя конечного изображения выбирается один пиксель исходного, наиболее близкий к его положению с учетом масштабирования.",
       toggle: null,
-      color1: "",
-      color2: "",
+      rgb1: "",
+      rgb2: "",
+      xyz1: "",
+      xyz2: "",
+      lab1: "",
+      lab2: "",
+      pos1: "",
+      pos2: "",
       swatch1: "",
       swatch2: "",
       contrast: "",
@@ -750,12 +771,18 @@ export default {
           var pixelData = ctx.getImageData(pos.x, pos.y, 1, 1);
           var xyz = this.RGBtoXYZ([pixelData.data[0], pixelData.data[1], pixelData.data[2]]);
           if (evt.altKey) {
-            this.color2 = this.posData + " " + this.colorData + " XYZ(" + (xyz[0] * 100).toFixed(2) + "%, " + (xyz[1] * 100).toFixed(2) + "%, " + (xyz[2] * 100).toFixed(2) + "%) " + this.RGBtoLAB([pixelData.data[0], pixelData.data[1], pixelData.data[2]]);
             this.swatch2 = this.colorData;
+            this.pos2 = this.posData;
+            this.rgb2 = this.colorData;
+            this.xyz2 = "XYZ(" + (xyz[0] * 100).toFixed(2) + "%, " + (xyz[1] * 100).toFixed(2) + "%, " + (xyz[2] * 100).toFixed(2) + "%)";
+            this.lab2 = this.RGBtoLAB([pixelData.data[0], pixelData.data[1], pixelData.data[2]]);
             luma2 = xyz[1];
           } else {
-            this.color1 = this.posData + " " + this.colorData + " XYZ(" + (xyz[0] * 100).toFixed(2) + "%, " + (xyz[1] * 100).toFixed(2) + "%, " + (xyz[2] * 100).toFixed(2) + "%) " + this.RGBtoLAB([pixelData.data[0], pixelData.data[1], pixelData.data[2]]);
             this.swatch1 = this.colorData;
+            this.pos1 = this.posData;
+            this.rgb1 = this.colorData;
+            this.xyz1 = "XYZ(" + (xyz[0] * 100).toFixed(2) + "%, " + (xyz[1] * 100).toFixed(2) + "%, " + (xyz[2] * 100).toFixed(2) + "%)";
+            this.lab1 = this.RGBtoLAB([pixelData.data[0], pixelData.data[1], pixelData.data[2]]);
             luma1 = xyz[1];
           }
           if (luma1 != null && luma2 != null) {
