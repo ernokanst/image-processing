@@ -105,6 +105,8 @@
                 @click="openPicker"></v-btn>
               <v-btn icon="mdi-chart-bell-curve-cumulative" v-tooltip:top="'Кривые: управляйте цветами'"
                 @click="openCurves"></v-btn>
+              <v-btn icon="mdi-focus-field" v-tooltip:top="'Фильтры: обрабатывайте изображение с помощью ядра свёртки'"
+                @click=""></v-btn>
             </v-btn-toggle>
           </td>
           <td id="dim" class="info">Размер изображения: </td>
@@ -479,7 +481,7 @@ Filter.Init = function () {
 }
 Filter.applyFilter = function () {
   if (CC == undefined) return;
-  var imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+  var imageData = this.ctx.getImageData(0, 0, imgwidth, imgheight);
   var pix = imageData.data;
   for (var i = 0; i < pix.length; i++) {
     pix[i] = CC.rgb[Filter.originalPixels[i]];
