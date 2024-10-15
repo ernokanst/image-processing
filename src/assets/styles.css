@@ -70,6 +70,15 @@ td.picker {
     background-color: #ffffff;
     color: #000000;
 }
+input.picker {
+    border: 1px solid #dededf;
+    background-color: #ffffff;
+    color: #000000;
+    width: 50px;
+    height: 50px;
+    text-align: center;
+    font-size: 150%;
+}
 .curves {
     position: fixed;
     top: 0;
@@ -86,4 +95,37 @@ td.picker {
 .curve {
     border: 1px solid #000000;
     
+}
+.row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.number-box {
+    width: 50px;
+    height: 50px;
+    text-align: center;
+    font-size: 150%;
+}
+.number-box::-webkit-inner-spin-button,
+.number-box::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    margin: 0; 
+}
+.picker::-webkit-inner-spin-button,
+.picker::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    margin: 0; 
+}
+.kernels {
+    position: fixed;
+    bottom: 130px;
+    right: 0;
+    background-color: #ffffff;
+    border: 2px solid #000000;
+    padding: 8px;
 }

@@ -46,14 +46,18 @@
           <td class="picker">Lab</td>
         </tr>
         <tr class="picker">
-          <td class="picker"><div class="swatch" :style="{ backgroundColor: swatch1 }"></div></td>
+          <td class="picker">
+            <div class="swatch" :style="{ backgroundColor: swatch1 }"></div>
+          </td>
           <td class="picker">{{ pos1 }}</td>
           <td class="picker">{{ rgb1 }}</td>
           <td class="picker">{{ xyz1 }}</td>
           <td class="picker">{{ lab1 }}</td>
         </tr>
         <tr class="picker">
-          <td class="picker"><div class="swatch" :style="{ backgroundColor: swatch2 }"></div></td>
+          <td class="picker">
+            <div class="swatch" :style="{ backgroundColor: swatch2 }"></div>
+          </td>
           <td class="picker">{{ pos2 }}</td>
           <td class="picker">{{ rgb2 }}</td>
           <td class="picker">{{ xyz2 }}</td>
@@ -95,6 +99,56 @@
         <v-btn variant="text" prepend-icon="mdi-check" @click="applyCurves">Применить</v-btn>
       </v-row>
     </div>
+    <div class="kernels" id="kernels" style="display: none;">
+      <h3>Ядра</h3>
+      <div class="row" style="flex-direction: column">
+        <table id="kernel-table" class="picker">
+          <tr class="picker">
+            <td class="picker"><input class="number-box" type="number" id="kernel0" @input="handleKernelInput"
+                value="0" />
+            </td>
+            <td class="picker"><input class="number-box" type="number" id="kernel1" @input="handleKernelInput"
+                value="0" />
+            </td>
+            <td class="picker"><input class="number-box" type="number" id="kernel2" @input="handleKernelInput"
+                value="0" />
+            </td>
+          </tr>
+          <tr class="picker">
+            <td class="picker"><input class="number-box" type="number" id="kernel3" @input="handleKernelInput"
+                value="0" />
+            </td>
+            <td class="picker"><input class="number-box" type="number" id="kernel4" @input="handleKernelInput"
+                value="1" />
+            </td>
+            <td class="picker"><input class="number-box" type="number" id="kernel5" @input="handleKernelInput"
+                value="0" />
+            </td>
+          </tr>
+          <tr class="picker">
+            <td class="picker"><input class="number-box" type="number" id="kernel6" @input="handleKernelInput"
+                value="0" />
+            </td>
+            <td class="picker"><input class="number-box" type="number" id="kernel7" @input="handleKernelInput"
+                value="0" />
+            </td>
+            <td class="picker"><input class="number-box" type="number" id="kernel8" @input="handleKernelInput"
+                value="0" />
+            </td>
+          </tr>
+        </table>
+        <input id="scale-input" class="picker" type="number" @input="handleKernelInput" value="1" />
+        <v-select label="Преднастроенные значения" v-model="effectChoice" :items="kernelEffects"
+          @update:model-value="presetKernels"></v-select>
+      </div>
+      <v-checkbox label="Предпросмотр" id="previewKernel" v-model="previewKernel"
+        @click="checkKernelPreview"></v-checkbox>
+      <v-row style="margin: 8px;">
+        <v-btn variant="text" prepend-icon="mdi-close" @click="closeKernels">Закрыть</v-btn>
+        <v-btn variant="text" prepend-icon="mdi-reload" @click="resetKernels">Сброс</v-btn>
+        <v-btn variant="text" prepend-icon="mdi-check" @click="applyKernels">Применить</v-btn>
+      </v-row>
+    </div>
     <table class="info">
       <tr class="info">
         <h2>
@@ -106,7 +160,7 @@
               <v-btn icon="mdi-chart-bell-curve-cumulative" v-tooltip:top="'Кривые: управляйте цветами'"
                 @click="openCurves"></v-btn>
               <v-btn icon="mdi-focus-field" v-tooltip:top="'Фильтры: обрабатывайте изображение с помощью ядра свёртки'"
-                @click=""></v-btn>
+                @click="openKernels"></v-btn>
             </v-btn-toggle>
           </td>
           <td id="dim" class="info">Размер изображения: </td>
@@ -138,6 +192,10 @@ var mouseDown = false;
 var initPos = null;
 var curvedImg = null;
 var oldCCpoints = [0, 0, 1, 1];
+var oldKernel = [0, 0, 0, 0, 1, 0, 0, 0, 0];
+var oldScale = 1;
+var origimage = null;
+var filteredImg = null;
 var colorHist = {
   r: new Array(256).fill(0),
   g: new Array(256).fill(0),
@@ -171,6 +229,7 @@ addEventListener("wheel", (evt) => {
     ctx.drawImage(img, newimgpos.x, newimgpos.y, imgwidth, imgheight);
     imgpos = newimgpos;
     checkCurve();
+    checkKernels();
   }
 });
 var cModified = document.createElement('canvas');
@@ -515,6 +574,78 @@ function checkCurve() {
   Filter.applyFilter();
   drawFilter();
 }
+function processKernels() {
+  var [kernel, scale] = parseKernels();
+  for (let i = 0; i < 9; i++) {
+    kernel[i] = kernel[i] / scale;
+  }
+  const dim = Math.sqrt(kernel.length);
+  const pad = Math.floor(dim / 2);
+  const initimg = structuredClone(origimage);
+  const pixels = initimg.data;
+  const width = imgwidth;
+  const height = imgheight;
+  if (dim % 2 !== 1) {
+    console.log('Invalid kernel dimension');
+  }
+  let pix, i, r, g, b;
+  const w = width;
+  const h = height;
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      r = 0;
+      g = 0;
+      b = 0;
+      for (let kx = -pad; kx <= pad; kx++) {
+        for (let ky = -pad; ky <= pad; ky++) {
+
+          i = (ky + pad) * dim + (kx + pad); // kernel index
+          pix = 4 * ((row + ky) * w + (col + kx)); // image index
+          r += pixels[pix++] * kernel[i];
+          g += pixels[pix++] * kernel[i];
+          b += pixels[pix] * kernel[i];
+        }
+      }
+      pix = 4 * ((row - pad) * w + (col - pad)); // destination index
+      pixels[pix++] = r;
+      pixels[pix++] = g;
+      pixels[pix++] = b;
+      pixels[pix] = 255; // we want opaque image
+    }
+  }
+  filteredImg = initimg;
+  if (document.getElementById("previewKernel").checked) {
+    drawKernels();
+  }
+}
+function drawKernels() {
+  var c = document.getElementById("myCanvas");
+  var ctx = c.getContext("2d", { willReadFrequently: true });
+  c.style.imageRendering = "pixelated";
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.putImageData(filteredImg, imgpos.x, imgpos.y);
+}
+function checkKernels() {
+  var c = document.getElementById("myCanvas");
+  var ctx = c.getContext("2d", { willReadFrequently: true });
+  origimage = ctx.getImageData(imgpos.x, imgpos.y, imgwidth, imgheight);
+  processKernels();
+  drawKernels();
+}
+function parseKernels() {
+  const table = document.getElementById('kernel-table');
+  const scaleInput = document.getElementById('scale-input');
+  const squareMatrix = [];
+  const scale = Number(scaleInput.value);
+  for (const { cells: [c1, c2, c3] } of table.rows) {
+    for (const c of [c1, c2, c3]) {
+      const [inputC] = c.children;
+      const value = Number(inputC.value);
+      squareMatrix.push(value);
+    }
+  }
+  return [squareMatrix, scale];
+}
 export default {
   data() {
     return {
@@ -531,6 +662,8 @@ export default {
       measureH: "",
       sizeChoice: "Пиксели",
       sizeMeasures: ["Пиксели", "Проценты"],
+      effectChoice: "Тождественное отображение",
+      kernelEffects: ["Тождественное отображение", "Повышение резкости", "Фильтр Гаусса", "Прямоугольное размытие"],
       preserveRatio: true,
       interChoice: "Ближайшего соседа",
       interMethods: ["Ближайшего соседа"],
@@ -548,6 +681,7 @@ export default {
       swatch2: "",
       contrast: "",
       preview: false,
+      previewKernel: false,
       posx1: 0,
       posy1: 0,
       posx2: 255,
@@ -596,7 +730,8 @@ export default {
         document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
         var sizes = [];
         sizes[0] = "";
-        var imgdata = ctx.getImageData(imgpos.x, imgpos.y, imgwidth, imgheight).data;
+        origimage = ctx.getImageData(imgpos.x, imgpos.y, imgwidth, imgheight);
+        var imgdata = origimage.data;
         for (var i = 0; i < imgdata.length; i += 4) {
           colorHist.r[imgdata[i]]++;
           colorHist.g[imgdata[i + 1]]++;
@@ -607,8 +742,8 @@ export default {
     },
     changeMeasure() {
       if (this.sizeChoice == "Пиксели") {
-        this.measureW = Math.floor(imgwidth);
-        this.measureH = Math.floor(imgheight);
+        this.measureW = Math.round(imgwidth);
+        this.measureH = Math.round(imgheight);
       }
       if (this.sizeChoice == "Проценты") {
         this.measureW = (imgwidth / img.width * 100).toFixed(2);
@@ -621,19 +756,13 @@ export default {
       }
     },
     changeImageSize() {
-      var c = document.getElementById("myCanvas");
-      var ctx = c.getContext("2d", { willReadFrequently: true });
-      c.style.imageRendering = "pixelated";
-      ctx.clearRect(0, 0, c.width, c.height);
       scale = parseFloat(this.scaleSlider) / 100;
       imgpos = { x: imgpos.x - (newimgwidth * parseFloat(this.scaleSlider) / 100 - imgwidth) / 2, y: imgpos.y - (newimgheight * parseFloat(this.scaleSlider) / 100 - imgheight) / 2 };
       imgwidth = newimgwidth * parseFloat(this.scaleSlider) / 100;
       imgheight = newimgheight * parseFloat(this.scaleSlider) / 100;
       this.newMP = (imgwidth * imgheight / 1000000).toFixed(2);
-      ctx.drawImage(img, imgpos.x, imgpos.y, imgwidth, imgheight);
-      document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
       this.changeMeasure();
-      checkCurve();
+      this.updateSize();
     },
     updateSize() {
       if (parseFloat(this.measureW) <= 0 || parseFloat(this.measureH) <= 0) {
@@ -660,12 +789,13 @@ export default {
       newimgheight = imgheight / scale;
       ctx.drawImage(img, imgpos.x, imgpos.y, imgwidth, imgheight);
       checkCurve();
+      checkKernels();
       document.getElementById("dim").textContent = "Размер изображения: " + [Math.floor(imgwidth.toFixed(2)), Math.floor(imgheight.toFixed(2))].toString();
     },
     fixedRatioW() {
       if (this.sizeChoice == "Пиксели") {
         if (this.preserveRatio) {
-          this.measureH = String(Math.floor(imgheight * (parseFloat(this.measureW) / imgwidth)));
+          this.measureH = String(Math.round(imgheight * (parseFloat(this.measureW) / imgwidth)));
         }
         this.newMP = (parseFloat(this.measureW) * parseFloat(this.measureH) / 1000000).toFixed(2);
       }
@@ -679,7 +809,7 @@ export default {
     fixedRatioH() {
       if (this.sizeChoice == "Пиксели") {
         if (this.preserveRatio) {
-          this.measureW = String(Math.floor(imgwidth * (parseFloat(this.measureH) / imgheight)));
+          this.measureW = String(Math.round(imgwidth * (parseFloat(this.measureH) / imgheight)));
         }
         this.newMP = (parseFloat(this.measureW) * parseFloat(this.measureH) / 1000000).toFixed(2);
       }
@@ -719,10 +849,71 @@ export default {
       x.style.display = "none";
       if (this.toggle == 1) this.toggle = -1;
     },
+    presetKernels() {
+      var kernel, scale;
+      switch (this.effectChoice) {
+        case "Тождественное отображение":
+          kernel = [0, 0, 0, 0, 1, 0, 0, 0, 0];
+          scale = 1;
+          break;
+        case "Повышение резкости":
+          kernel = [0, -1, 0, -1, 5, -1, 0, -1, 0];
+          scale = 1;
+          break;
+        case "Фильтр Гаусса":
+          kernel = [1, 2, 1, 2, 4, 2, 1, 2, 1];
+          scale = 16;
+          break;
+        case "Прямоугольное размытие":
+          kernel = [1, 1, 1, 1, 1, 1, 1, 1, 1];
+          scale = 9;
+          break;
+        default:
+          kernel = [0, 0, 0, 0, 1, 0, 0, 0, 0];
+          scale = 1;
+      }
+      for (let i = 0; i < 9; i++) {
+        document.getElementById("kernel" + i).value = kernel[i];
+      }
+      document.getElementById("scale-input").value = scale;
+      this.checkKernelPreview();
+    },
+    openKernels() {
+      if (this.toggle == 3) {
+        var x = document.getElementById("kernels");
+        x.style.display = "block";
+      }
+    },
+    closeKernels() {
+      for (let i = 0; i < 9; i++) {
+        document.getElementById("kernel" + i).value = oldKernel[i];
+      }
+      document.getElementById("scale-input").value = oldScale;
+      processKernels();
+      drawKernels();
+      var x = document.getElementById("kernels");
+      x.style.display = "none";
+      if (this.toggle == 3) this.toggle = -1;
+    },
+    resetKernels() {
+      this.effectChoice = "Тождественное отображение";
+      this.presetKernels();
+    },
+    applyKernels() {
+      processKernels();
+      drawKernels();
+      [oldKernel, oldScale] = parseKernels();
+      var x = document.getElementById("kernels");
+      x.style.display = "none";
+      if (this.toggle == 3) this.toggle = -1;
+    },
     openCurves() {
       var x = document.getElementById("curves");
       x.style.display = "block";
-      this.curveStart();
+      if (CC == undefined) {
+        CC = new ColorCurve('selector', function () { Filter.applyFilter(); });
+      }
+      Filter.Init();
     },
     closeCurves() {
       CC.points[0].x = oldCCpoints[0];
@@ -733,6 +924,7 @@ export default {
       CC.updateValues();
       this.checkDots();
       checkCurve();
+      checkKernels();
       var x = document.getElementById("curves");
       x.style.display = "none";
       if (this.toggle == 2) this.toggle = -1;
@@ -746,6 +938,7 @@ export default {
       CC.updateValues();
       this.checkDots();
       checkCurve();
+      checkKernels();
     },
     applyCurves() {
       Filter.applyFilter();
@@ -757,12 +950,6 @@ export default {
       var x = document.getElementById("curves");
       x.style.display = "none";
       if (this.toggle == 2) this.toggle = -1;
-    },
-    curveStart() {
-      if (CC == undefined) {
-        CC = new ColorCurve('selector', function () { Filter.applyFilter(); });
-      }
-      Filter.Init();
     },
     getColor(evt) {
       if (this.toggle == 1) {
@@ -836,6 +1023,7 @@ export default {
           imgpos = { x: imgpos.x + (pos.x - initPos.x), y: imgpos.y + (pos.y - initPos.y) };
           initPos = null;
           checkCurve();
+          checkKernels();
         }
         if (mouseDown) {
           if (initPos == null) {
@@ -907,6 +1095,24 @@ export default {
         CC.updateValues();
       }
     },
+    checkKernelPreview() {
+      if (document.getElementById("previewKernel").checked) {
+        processKernels();
+      } else {
+        var tmp = parseKernels();
+        for (let i = 0; i < 9; i++) {
+          document.getElementById("kernel" + i).value = oldKernel[i];
+        }
+        document.getElementById("scale-input").value = oldScale;
+        processKernels();
+        drawKernels();
+        for (let i = 0; i < 9; i++) {
+          document.getElementById("kernel" + i).value = tmp[0][i];
+        }
+        document.getElementById("scale-input").value = tmp[1];
+        processKernels();
+      }
+    },
     checkDots() {
       if (CC == undefined) return;
       this.posx1 = Math.ceil(CC.points[0].x * 255);
@@ -930,6 +1136,9 @@ export default {
       CC.points[1].y = this.posy2 / 255;
       CC.draw();
       CC.updateValues();
+    },
+    handleKernelInput() {
+      processKernels();
     }
   }
 }
